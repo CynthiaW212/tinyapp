@@ -26,12 +26,17 @@ app.get("/urls.json",(req,res) => {
 // });
 
 app.get("/urls", (req, res) => {
-  const urls = { urls: urlDatabase };
-  res.render("urls_index", urls);
+  const templateVars = { urls: urlDatabase };
+  res.render("urls_index", templateVars);
 });
 
 app.get("/hello", (req, res) => {
   const templateVars = { greeting: "Hello World!" };
   res.render("hello_world", templateVars);
+});
+
+app.get("/urls/:id", (req, res) => {
+  const templateVars = { id: req.params.id, longURL:urlDatabase[req.params.id]};
+  res.render("urls_show", templateVars);
 });
 
