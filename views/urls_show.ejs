@@ -22,8 +22,8 @@
         <p class="card-text">
           Short URL ID: <a href="/u/<%= id %>"><%= id %></a>
         </p>
-        <form class="form-inline" action="/urls/<%= id %>/edit" method="POST">
-          <div class="form-group mb-2">
+        <form class="form-inline" style="display: flex; flex-direction: column; align-items: center;" action="/urls/<%= id %>/edit" method="POST">
+          <div class="form-group mb-2" >
             <label for="Edit">Edit the URL:</label>
             <input
               class="form-control"
