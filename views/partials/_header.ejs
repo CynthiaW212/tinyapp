@@ -17,6 +17,13 @@
         <a class="nav-item nav-link" href="/urls">My URLs</a>
         <a class="nav-item nav-link" href="/urls/new">Create New URL</a>
       </div>
+      <div class="collapse navbar-collapse" style="display: flex; flex-direction: column; align-items: right;">
+      <form class="collapse navbar-collapse" action="/urls/login" method="POST">
+        <div>
+          <input name="username" value="<%= username %>"/> <button type="submit">Login</button>
+        </div>
+      </form>
+    </div>
     </div>
   </nav>
 </header>
