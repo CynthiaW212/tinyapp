@@ -32,10 +32,10 @@
         </thead>
         <tbody>
           
-          <% for (let id in urls) { %>
+          <% for (let id in myUrls) { %>
             <tr>
               <td><a href="/urls/<%= id %>"><%= id %></a></td>
-              <td><%= urls[id] %></td>  
+              <td><%= myUrls[id] %></td>  
               <td><a href="/urls/<%= id %>">Edit</a></td>
               
               <form method="POST" action="/urls/<%= id %>/delete">   
