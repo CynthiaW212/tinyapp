@@ -38,7 +38,15 @@ app.get("/hello", (req, res) => {
 });
 
 app.get("/urls", (req, res) => {
-  const templateVars = { urls: urlDatabase, username:req.cookies["username"].username };
+  const templateVars = { urls: urlDatabase};
+  if (req.cookies["username"]) {
+    templateVars.username = req.cookies["username"].username;
+  } else if (req.body.username) {
+    console.log("get url username ",req.body.username);
+    templateVars.username = req.body.username;
+  } else {
+    templateVars.username = '';
+  }
   res.render("urls_index", templateVars);
 });
 
@@ -48,12 +56,23 @@ app.get("/hello", (req, res) => {
 });
 
 app.get("/urls/new", (req, res) => {
-  
-  res.render("urls_new",req.cookies["username"]);
+  if (req.cookies["username"]) {
+    res.render("urls_new",req.cookies["username"]);
+  } else {
+    res.redirect("/urls");
+  }
 });
 
 app.get("/urls/:id", (req, res) => {
-  const templateVars = { id: req.params.id, longURL:urlDatabase[req.params.id],username:req.cookies["username"].username};
+  const templateVars = { id: req.params.id, longURL:urlDatabase[req.params.id]};
+  if (req.cookies["username"]) {
+    templateVars.username = req.cookies["username"].username;
+  } else if (req.body.username) {
+    console.log("get url username ",req.body.username);
+    templateVars.username = req.body.username;
+  } else {
+    templateVars.username = '';
+  }
   res.render("urls_show", templateVars);
 });
 
@@ -64,7 +83,7 @@ app.post("/urls", (req, res) => {
   
   // Redirect the client to the URL containing the ID
   // res.redirect(`/urls/${id}`);
-  res.redirect(`/urls/${id}?usename=${req.cookies["username"].username}`);
+  res.redirect(`/urls/${id}?username=${req.cookies["username"].username}`);
 });
 
 app.get("/u/:id", (req, res) => {
@@ -77,18 +96,42 @@ app.get("/u/:id", (req, res) => {
 app.post("/urls/:id/delete",(req,res) =>{
   const id = req.params.id;
   delete urlDatabase[id];
-  res.redirect("/urls" + "?usename=" + req.cookies["username"].username);
+  let username = '';
+  if (req.cookies["username"]) {
+    username = req.cookies["username"].username;
+  } else if (req.body.username) {
+
+    username = req.body.username;
+  }
+  res.redirect("/urls" + "?username=" + username);
 });
 
 app.post("/urls/:id/edit",(req,res) =>{
   const id = req.params.id;
   urlDatabase[id] = req.body.longURL;
-  res.redirect("/urls" + "?usename=" + req.cookies["username"].username);
+  let username = '';
+  if (req.cookies["username"]) {
+    username = req.cookies["username"].username;
+  } else if (req.body.username) {
+
+    username = req.body.username;
+  }
+  res.redirect("/urls" + "?username=" + username);
 });
 
 app.post("/urls/login",(req,res) =>{
-  console.log(req.body);
   res.cookie('username', req.body);
+  
+  const user = req.body.username;
+  console.log("user is ",user);
+  console.log(user);
+  res.redirect("/urls" + "?username=" + user);
+  
+});
+
+app.post("/urls/logout",(req,res) =>{
+  console.log(req.body);
+  res.clearCookie('username');
   res.redirect("/urls");
   
 });
