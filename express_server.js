@@ -1,5 +1,7 @@
 const express = require("express");
+const helpers = require('./helpers');
 const cookieParser = require('cookie-parser');
+const cookieSession = require("cookie-session");
 const bcrypt = require("bcryptjs");
 const app = express();
 const PORT = 8080; // default port 8080
@@ -7,6 +9,14 @@ const PORT = 8080; // default port 8080
 app.set("view engine", "ejs");
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(cookieSession({
+  name: 'session',
+  keys: ['key1', 'key2']
+}));
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 const urlDatabase = {
   b6UTxQ: {
@@ -46,7 +56,11 @@ const generateRandomString = (length)=> {
 };
 
 app.get("/", (req, res) => {
-  res.send("Hello!");
+  const userId = req.session.userId;
+  if (!userId) {
+    return res.redirect("/login");
+  }
+  return res.redirect("/urls");
 });
 
 app.listen(PORT, () => {
@@ -72,42 +86,46 @@ const urlsForUser = (id) =>{
   return myUrls;
 };
 
-const uIdForUser = (id, userid) => {
-  if (urlDatabase[id].userID === userid) {
-    return true;
-  }
-  return false;
-};
+
 
 app.get("/urls", (req, res) => {
   
-  const templateVars = {};
-  let user = users[req.cookies["user_id"]];
-  
-  if (!user) {
-    user = {};
-    return res.redirect("/login");
-  }
-  templateVars.user = user;
-  const myUrls = urlsForUser(user.id);
-  templateVars.myUrls = myUrls;
+  const userId = req.session.userId;
 
-  res.render("urls_index", templateVars);
+  if (!userId) {
+    // User doesn't login, render login page with error
+    return res.render("login",{user:{id: undefined}, error:"Please login first !"});
+  }
+  
+  if (!users[userId]) {
+    //UserId doesn't in database, render login page with error
+    return res.render("login", { user: { id: undefined }, error: " Invalid user, please login." });
+  }
+
+  const user = {id:userId, email:users[userId].email};
+  //Get urls based on userId
+  const myUrls = urlsForUser(user.id);
+  const templateVars = {user, myUrls, error: undefined};
+
+  return res.render("urls_index", templateVars);
 });
+
 
 app.get("/hello", (req, res) => {
   const templateVars = { greeting: "Hello World!" };
-  res.render("hello_world", templateVars);
+  return res.render("hello_world", templateVars);
 });
 
+
 app.get("/register",(req,res)=>{
-  if (req.cookies["user_id"]) {
-    res.redirect("/urls");
-  } else {
-    const templateVars = { greeting: "Welcome regester!" };
-    templateVars.user = {};
-    res.render("register", templateVars);
+
+  const userId = req.session.userId;
+
+  if (userId && users[userId]) {
+    return res.redirect("/urls");
   }
+  const templateVars = { user:{id:undefined}, error:undefined};
+  return res.render("register", templateVars);
 });
 
 app.post("/register", (req, res) => {
@@ -115,139 +133,149 @@ app.post("/register", (req, res) => {
   const password = req.body.password;
 
   if (email === "" || password === "") {
-    return res.status(400).send("Email and password cannot be empty!");
+    return res.render("register",{user:{id: undefined}, error:"Email and password cannot be empty !"});
   }
-  if (getUserByEmail(email)) {
-    return res.status(400).send("EXIST USER");
-  }
-  const id = generateRandomString("6");
-  const hashedPassword = bcrypt.hashSync(password,10);
-  
-  users[id] = { id, email, hashedPassword };
 
-  res.cookie('user_id', id);
+  if (helpers.getUserByEmail(email,users)) {
+    // email exists in user database, render register with error
+    return res.render("register",{user:{id: undefined}, error:"User exist, please login!"});
+  }
+
+  const id = generateRandomString("6");// Get random id
+  const hashedPassword = bcrypt.hashSync(password,10);//Encrypt password
+  users[id] = { id, email, hashedPassword };//Add new user to user database
+  req.session.userId = id;//set session userId
+
   return res.redirect("/urls");
-
 });
 
-const getUserByEmail = (email)=>{
-  for (let u in users) {
-    if (users[u].email === email) return users[u].id;
-  }
-  return null;
-};
 
 app.get("/login",(req,res)=>{
-  if (req.cookies["user_id"]) {
+
+  const userId = req.session.userId;
+  //User exists in userdatabase, redirect to urls page
+  if (userId && users[userId]) {
     res.redirect("/urls");
-  } else {
-    const templateVars = { greeting: "Welcome login!" };
-    templateVars.user = {};
-    res.render("login", templateVars);
   }
+
+  const templateVars = { user:{id:undefined}, error: undefined };
+  res.render("login", templateVars);
+  
 });
 
 app.get("/urls/new", (req, res) => {
-  let user = {};
-  if (req.cookies["user_id"]) {
-    user = users[req.cookies["user_id"]];
-    res.render("urls_new",{user});
-  } else {
-    res.render("login",{user});
+  
+  //User doesn't exist, render login page with error
+  if (!req.session.userId) {
+    return res.render("login",{user:{id: undefined}, error:"Please login first !"});
   }
+  const user = users[req.session.userId];
+  return res.render("urls_new",{user,error: undefined});
 });
 
 app.get("/urls/:id", (req, res) => {
-  const templateVars = { id: req.params.id, longURL:urlDatabase[req.params.id].longURL};
-  const user = users[req.cookies["user_id"]];
-  if (user.id === urlDatabase[req.params.id].userID) {
-    templateVars.user = user;
-    return res.render("urls_show", templateVars);
-  } else {
-    return res.status("400").send("Not permitted");
+  const id = req.params.id;
+  const user = users[req.session.userId];
+  const templateVars = { id, user, longURL:undefined, error: undefined};
+
+  //shorturl doesn't exist in urldatabase,render urls_show with error.
+  if (!urlDatabase[id]) {
+    templateVars.longURL = undefined;
+    templateVars.error = "Short url invalid!";
+    return res.status(400).render("urls_show",templateVars);
+    
   }
 
+  // shorurl not belong to current user, render urls_show with error.
+  if (user.id !== urlDatabase[req.params.id].userID) {
+    templateVars.error = "You don't have permission to view this url!";
+    return res.status(400).render("urls_show",templateVars);
+  }
+  //All good, get longURL, render urls_show
+  templateVars.longURL = urlDatabase[id].longURL;
+  return res.render("urls_show", templateVars);
 });
 
 app.post("/urls", (req, res) => {
-  if (req.cookies["user_id"]) {
-    const id = generateRandomString(6);
-    urlDatabase[id] = {};
-    urlDatabase[id].longURL = req.body.longURL;
-    urlDatabase[id].userID = req.cookies["user_id"];
-
-    // Redirect the client to the URL containing the ID
-    res.redirect(`/urls/${id}`);
-  } else {
-    res.render("login", { error: "please login first~" });
+  if (!req.session.userId) {
+    // User doesn't login, render login page with error
+    return res.render("login",{user:{id: undefined}, error:"Please login first !"});
   }
+  const id = generateRandomString(6);
+  urlDatabase[id] = { longURL: req.body.longURL, userID: req.session.userId };
+
+  // Redirect the client to the URL containing the ID
+  return res.redirect(`/urls/${id}`);
 });
 
 app.get("/u/:id", (req, res) => {
   
   const id = req.params.id;
-  let longURL = null;
+  let longURL = undefined;
   for (let u in urlDatabase) {
     if (u === id) {
       longURL = urlDatabase[u].longURL;
     }
   }
-
-  if (longURL) {
-    return res.redirect(longURL);
-  } else {
-    return res.status(400).send("short URL doesn't exist");
+  if (!longURL) {
+    return res.status(400).send("Not a valiurlDatabased short url.");
   }
+  return res.redirect(longURL);
+
 });
 
 app.post("/urls/:id/delete",(req,res) =>{
   const id = req.params.id;
-  const userid = req.cookies["user_id"];
-  if (uIdForUser(id, userid)) {
-    delete urlDatabase[id];
-    res.redirect("/urls");
-  } else {
-    res.status(400).send("Permission denied. ");
+  const userid = req.session.userId;
+  const myUrls = urlsForUser(userid);
+  //if url was not creat by current user, render urls_index with error
+  if (!helpers.uIdForUser(id, userid,urlDatabase)) {
+    return res.status(400).render("urls_index",{ user:users[userid],myUrls:myUrls, error:"You don't have permission to delete this url."});
   }
+  delete urlDatabase[id];
+  return res.redirect("/urls");
 });
 
 app.post("/urls/:id/edit",(req,res) =>{
   const id = req.params.id;
-  const userid = req.cookies["user_id"];
-  if (uIdForUser(id, userid)) {
-    urlDatabase[id].longURL = req.body.longURL;
-    res.redirect("/urls");
-  } else {
-    res.status(400).send("Permission denied. ");
+  const userid = req.session.userId;
+  //if url was not creat by current user,render urls_show with error
+  if (!helpers.uIdForUser(id, userid,urlDatabase)) {
+    return res.status(400).render("urls_show",{ id,user:users[userid], longURL:undefined, error:"You don't have permission to edit this url."});
   }
+  urlDatabase[id].longURL = req.body.longURL;
+  res.redirect("/urls");
 });
 
 app.post("/login",(req,res) =>{
- 
   const email = req.body.email;
   const password = req.body.password;
-  const userid = getUserByEmail(email);
+  const userid = helpers.getUserByEmail(email,users);
   
-  if (userid !== null) {
-    res.cookie("user_id", userid);
-
-    if (users[userid].email === email && bcrypt.compareSync(password, users[userid].hashedPassword)) {
-      //
-      const myUrls = urlsForUser(userid);
-
-      res.render("urls_index", { myUrls: myUrls, user: users[userid] });
-    } else {
-      return res.status(403).send("email and password doesn't match!");
-    }
-  } else {
-    return res.status(403).send("Unexiting email, please register first!");
+  if (!userid) {
+    // User doesn't exist, render login page with error message
+    return res.status(403).render("login", { error: "Unexiting email, please register first!",user:{id: undefined} });
   }
-  
+
+  if (users[userid].email !== email || !bcrypt.compareSync(password, users[userid].hashedPassword)) {
+    // email and password doesn't match, render login page with error message
+    return res.status(403).render("login", { error: "Email and password doesn't match!",user:{id: undefined} });
+  }
+
+  req.session.userId = userid;
+
+  //Get all urls belong to user according userid
+  const myUrls = urlsForUser(userid);
+
+  //User exists, render login page with urls and user
+  return res.render("urls_index", { myUrls: myUrls, user: users[userid], error:undefined});
+
 });
 
 app.post("/logout",(req,res) =>{
 
-  res.clearCookie('user_id');
+  delete req.session.userId;
+  res.clearCookie('session');
   res.redirect("/login");
 });
 
