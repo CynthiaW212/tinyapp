@@ -20,8 +20,11 @@
         
         <h5 class="card-title">TinyURL for: <%= longURL %></h5>
         <p class="card-text">
-          Short URL ID: <a href="/urls/<%= id %>"><%= id %></a>
+          Short URL ID: <a href="/u/<%= id %>"><%= id %></a>
         </p>
+        <% if (error) { %>
+          <p class="error" style="color: crimson;"><%= error %></p>
+        <% } %>
         <form class="form-inline" style="display: flex; flex-direction: column; align-items: center;" action="/urls/<%= id %>/edit" method="POST">
           <div class="form-group mb-2" >
             <label for="Edit">Edit the URL:</label>
