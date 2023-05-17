@@ -20,7 +20,7 @@
       <div class="collapse navbar-collapse" style="display: flex; flex-direction: column; align-items: right;">
       
          
-      <% if (Object.keys(user).length === 0) {%>
+      <% if (!user.id) {%>
         <div class="navbar-nav">
         <a class="nav-item nav-link" href="/login">Login</a>
         <a class="nav-item nav-link" href="/register">Register</a>
