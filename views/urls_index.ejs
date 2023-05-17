@@ -31,19 +31,23 @@
           </tr>
         </thead>
         <tbody>
-          
+          <% if (error) { %>
+            <p class="error" style="color: crimson;"><%= error %></p>
+          <% } %>
           <% for (let id in myUrls) { %>
             <tr>
               <td><a href="/urls/<%= id %>"><%= id %></a></td>
               <td><%= myUrls[id] %></td>  
-              <td><a href="/urls/<%= id %>">Edit</a></td>
+              <form method="get" action="/urls/<%= id %>">   
+                <td><button type="submit">Edit</button></td>
+              </form>
               
               <form method="POST" action="/urls/<%= id %>/delete">   
                 <td><button type="submit">delete</button></td>
               </form>
-              
             </tr>
           <% } %>
+
         </tbody>
       </table>
     </main>
